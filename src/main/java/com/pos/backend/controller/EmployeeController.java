@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.List;
 public class EmployeeController {
 
     private final EmployeeRepository employeeRepository;
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @GetMapping
     public ResponseEntity<List<Employee>> getAllEmployees() {
@@ -51,6 +53,7 @@ public class EmployeeController {
         if (employee.getEmail() != null && employeeRepository.existsByEmail(employee.getEmail())) {
             throw new DuplicateResourceException("Employee", "email", employee.getEmail());
         }
+        employee.setPassword(passwordEncoder.encode(employee.getPassword()));
         Employee saved = employeeRepository.save(employee);
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
@@ -74,7 +77,7 @@ public class EmployeeController {
         employee.setActive(employeeDetails.isActive());
 
         if (employeeDetails.getPassword() != null && !employeeDetails.getPassword().isBlank()) {
-            employee.setPassword(employeeDetails.getPassword());
+            employee.setPassword(passwordEncoder.encode(employeeDetails.getPassword()));
         }
 
         return ResponseEntity.ok(employeeRepository.save(employee));

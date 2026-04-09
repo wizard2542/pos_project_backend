@@ -141,7 +141,9 @@ public class OrderController {
     ) {
         public record OrderItemRequest(
                 @NotNull(message = "Menu ID is required") Long menuId,
-                @NotNull(message = "Quantity is required") Integer quantity
+                @NotNull(message = "Quantity is required")
+                @jakarta.validation.constraints.Min(value = 1, message = "Quantity must be at least 1")
+                Integer quantity
         ) {}
     }
 }
