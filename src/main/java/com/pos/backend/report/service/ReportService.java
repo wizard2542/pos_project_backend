@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service responsible for generating PDF and XLSX reports using JasperReports.
@@ -39,6 +40,9 @@ import java.util.Map;
 public class ReportService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /** Cache of compiled JasperReport objects keyed by classpath resource path. */
+    private final Map<String, JasperReport> reportCache = new ConcurrentHashMap<>();
 
     private final OrderRepository orderRepository;
     private final TransactionRepository transactionRepository;
@@ -171,11 +175,17 @@ public class ReportService {
 
     private JasperPrint fillReport(String jrxmlClasspath, Map<String, Object> params,
                                    JRDataSource dataSource) {
-        try (InputStream is = new ClassPathResource(jrxmlClasspath).getInputStream()) {
-            JasperReport compiled = JasperCompileManager.compileReport(is);
+        try {
+            JasperReport compiled = reportCache.computeIfAbsent(jrxmlClasspath, path -> {
+                try (InputStream is = new ClassPathResource(path).getInputStream()) {
+                    return JasperCompileManager.compileReport(is);
+                } catch (IOException | JRException e) {
+                    throw new ReportGenerationException("Failed to compile report template: " + e.getMessage(), e);
+                }
+            });
             return JasperFillManager.fillReport(compiled, params, dataSource);
-        } catch (IOException | JRException e) {
-            throw new ReportGenerationException("Failed to generate report: " + e.getMessage(), e);
+        } catch (JRException e) {
+            throw new ReportGenerationException("Failed to fill report: " + e.getMessage(), e);
         }
     }
 
