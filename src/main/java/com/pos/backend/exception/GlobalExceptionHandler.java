@@ -1,5 +1,6 @@
 package com.pos.backend.exception;
 
+import com.pos.backend.report.service.ReportService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -68,6 +69,18 @@ public class GlobalExceptionHandler {
                 fieldErrors
         );
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(ReportService.ReportGenerationException.class)
+    public ResponseEntity<ErrorResponse> handleReportGenerationException(
+            ReportService.ReportGenerationException ex, WebRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                ex.getMessage(),
+                request.getDescription(false),
+                LocalDateTime.now()
+        );
+        return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     @ExceptionHandler(Exception.class)
