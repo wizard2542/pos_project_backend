@@ -105,7 +105,7 @@ public class ReportService {
                     return OrderReceiptItemDTO.builder()
                             .lineNumber(idx)
                             .menuName(item.getMenu().getName())
-                            .category(item.getMenu().getCategory())
+                            .category(item.getMenu().getCategory().getName())
                             .quantity(item.getQuantity())
                             .unitPrice(item.getUnitPrice())
                             .subTotal(item.getSubTotal())
