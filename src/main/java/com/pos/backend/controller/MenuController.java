@@ -1,6 +1,8 @@
 package com.pos.backend.controller;
 
 import com.pos.backend.exception.ResourceNotFoundException;
+import com.pos.backend.kafka.event.OrderCreatedEvent;
+import com.pos.backend.kafka.producer.KafkaProducerService;
 import com.pos.backend.model.Menu;
 import com.pos.backend.model.MenuCategory;
 import com.pos.backend.repository.MenuCategoryRepository;
@@ -12,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -21,6 +24,7 @@ public class MenuController {
 
     private final MenuRepository menuRepository;
     private final MenuCategoryRepository menuCategoryRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @GetMapping
     public ResponseEntity<List<Menu>> getAllMenus() {
@@ -115,4 +119,22 @@ public class MenuController {
                 .orElseGet(() -> menuCategoryRepository.save(
                         MenuCategory.builder().name(name).build()));
     }
+
+    @GetMapping("/kafka-test")
+    public ResponseEntity<Void> kafkaTest() {
+        // Implement Kafka test logic here
+        kafkaProducerService.publishOrderCreated(new OrderCreatedEvent(
+                999L,
+                "TEST-ORDER-999",
+                1L,
+                "Test Employee",
+                List.of(new OrderCreatedEvent.OrderItemDetail(1L, "Test Menu", 2, new BigDecimal("50.00"))),
+                new BigDecimal("100.00"),
+                "This is a test order",
+                LocalDateTime.now()
+        ));
+
+        return ResponseEntity.ok().build();
+    }
+
 }
