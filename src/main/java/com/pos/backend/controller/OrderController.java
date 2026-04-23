@@ -2,6 +2,9 @@ package com.pos.backend.controller;
 
 import com.pos.backend.exception.BadRequestException;
 import com.pos.backend.exception.ResourceNotFoundException;
+import com.pos.backend.kafka.event.OrderCreatedEvent;
+import com.pos.backend.kafka.event.OrderStatusUpdatedEvent;
+import com.pos.backend.kafka.producer.KafkaProducerService;
 import com.pos.backend.model.Employee;
 import com.pos.backend.model.Menu;
 import com.pos.backend.model.Order;
@@ -31,6 +34,7 @@ public class OrderController {
     private final OrderRepository orderRepository;
     private final EmployeeRepository employeeRepository;
     private final MenuRepository menuRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @GetMapping
     public ResponseEntity<List<Order>> getAllOrders() {
@@ -102,6 +106,23 @@ public class OrderController {
 
         order.setTotalAmount(totalAmount);
         Order saved = orderRepository.save(order);
+
+        kafkaProducerService.publishOrderCreated(new OrderCreatedEvent(
+                saved.getId(),
+                saved.getOrderNumber(),
+                employee.getId(),
+                employee.getName(),
+                saved.getItems().stream()
+                        .map(item -> new OrderCreatedEvent.OrderItemDetail(
+                                item.getMenu().getId(),
+                                item.getMenu().getName(),
+                                item.getQuantity(),
+                                item.getUnitPrice()))
+                        .toList(),
+                saved.getTotalAmount(),
+                saved.getNote(),
+                saved.getCreatedAt()));
+
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
@@ -110,8 +131,18 @@ public class OrderController {
                                                    @RequestParam Order.Status status) {
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", "id", id));
+        String previousStatus = order.getStatus().name();
         order.setStatus(status);
-        return ResponseEntity.ok(orderRepository.save(order));
+        Order saved = orderRepository.save(order);
+
+        kafkaProducerService.publishOrderStatusUpdated(new OrderStatusUpdatedEvent(
+                saved.getId(),
+                saved.getOrderNumber(),
+                previousStatus,
+                saved.getStatus().name(),
+                saved.getUpdatedAt()));
+
+        return ResponseEntity.ok(saved);
     }
 
     @DeleteMapping("/{id}")

@@ -2,6 +2,8 @@ package com.pos.backend.controller;
 
 import com.pos.backend.exception.BadRequestException;
 import com.pos.backend.exception.ResourceNotFoundException;
+import com.pos.backend.kafka.event.TransactionCompletedEvent;
+import com.pos.backend.kafka.producer.KafkaProducerService;
 import com.pos.backend.model.Order;
 import com.pos.backend.model.Transaction;
 import com.pos.backend.repository.OrderRepository;
@@ -25,6 +27,7 @@ public class TransactionController {
 
     private final TransactionRepository transactionRepository;
     private final OrderRepository orderRepository;
+    private final KafkaProducerService kafkaProducerService;
 
     @GetMapping
     public ResponseEntity<List<Transaction>> getAllTransactions() {
@@ -91,6 +94,17 @@ public class TransactionController {
         orderRepository.save(order);
 
         Transaction saved = transactionRepository.save(transaction);
+
+        kafkaProducerService.publishTransactionCompleted(new TransactionCompletedEvent(
+                saved.getId(),
+                order.getId(),
+                order.getOrderNumber(),
+                saved.getPaymentMethod().name(),
+                saved.getAmount(),
+                saved.getChangeAmount(),
+                saved.getStatus().name(),
+                saved.getCreatedAt()));
+
         return new ResponseEntity<>(saved, HttpStatus.CREATED);
     }
 
