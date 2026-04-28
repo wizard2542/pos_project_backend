@@ -9,6 +9,11 @@ import com.pos.backend.repository.MenuCategoryRepository;
 import com.pos.backend.repository.MenuRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,8 +32,56 @@ public class MenuController {
     private final KafkaProducerService kafkaProducerService;
 
     @GetMapping
-    public ResponseEntity<List<Menu>> getAllMenus() {
-        return ResponseEntity.ok(menuRepository.findAll());
+    public ResponseEntity<Page<Menu>> getAllMenus(
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String categoryName,
+            @RequestParam(required = false) Boolean available,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) String imageUrl,
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir) {
+
+        Specification<Menu> spec = Specification.where(null);
+
+        if (name != null && !name.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(cb.lower(root.get("name")), "%" + name.toLowerCase() + "%"));
+        }
+        if (description != null && !description.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(cb.lower(root.get("description")), "%" + description.toLowerCase() + "%"));
+        }
+        if (categoryName != null && !categoryName.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(cb.lower(root.get("category").get("name")), categoryName.toLowerCase()));
+        }
+        if (available != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("available"), available));
+        }
+        if (minPrice != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.greaterThanOrEqualTo(root.get("price"), minPrice));
+        }
+        if (maxPrice != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+        }
+        if (imageUrl != null && !imageUrl.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(cb.lower(root.get("imageUrl")), "%" + imageUrl.toLowerCase() + "%"));
+        }
+
+        int page = (limit > 0) ? offset / limit : 0;
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+        Pageable pageable = PageRequest.of(page, limit, sort);
+        return ResponseEntity.ok(menuRepository.findAll(spec, pageable));
     }
 
     @GetMapping("/available")
